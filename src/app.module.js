@@ -5,6 +5,7 @@ const { TypeOrmModule } = require('@nestjs/typeorm');
 
 const { AppController } = require('./app.controller');
 const { AppService } = require('./app.service');
+const { AuthModule } = require('./auth/auth.module');
 
 const { User } = require('./entities/user.entity');
 const { Category } = require('./entities/category.entity');
@@ -40,6 +41,8 @@ Module({
 
       synchronize: true,
     }),
+
+    AuthModule,
   ],
 
   controllers: [AppController],
