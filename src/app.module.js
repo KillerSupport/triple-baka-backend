@@ -1,50 +1,25 @@
-
 const { Module } = require('@nestjs/common');
 const { ConfigModule } = require('@nestjs/config');
 const { TypeOrmModule } = require('@nestjs/typeorm');
-
 const { AppController } = require('./app.controller');
 const { AppService } = require('./app.service');
 const { AuthModule } = require('./auth/auth.module');
-
-const { User } = require('./entities/user.entity');
-const { Category } = require('./entities/category.entity');
-const { Product } = require('./entities/product.entity');
-const { CartItem } = require('./entities/cart-item.entity');
-const { Order } = require('./entities/order.entity');
-const { OrderItem } = require('./entities/order-item.entity');
+const { CatalogModule } = require('./catalog/catalog.module');
+const { ShoppingModule } = require('./shopping/shopping.module');
+const { databaseOptions } = require('./database');
 
 class AppModule {}
 
 Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
+    ConfigModule.forRoot({ isGlobal: true }),
+    TypeOrmModule.forRootAsync({
+      useFactory: () => ({ ...databaseOptions(process.env), retryAttempts: 1 }),
     }),
-
-    TypeOrmModule.forRoot({
-      type: 'mysql',
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT),
-      username: process.env.DB_USERNAME,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_DATABASE,
-
-      entities: [
-        User,
-        Category,
-        Product,
-        CartItem,
-        Order,
-        OrderItem,
-      ],
-
-      synchronize: true,
-    }),
-
     AuthModule,
+    CatalogModule,
+    ShoppingModule,
   ],
-
   controllers: [AppController],
   providers: [AppService],
 })(AppModule);
