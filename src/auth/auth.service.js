@@ -1,152 +1,134 @@
-
 const {
+  Dependencies,
   Injectable,
   BadRequestException,
   ConflictException,
+  HttpException,
   UnauthorizedException,
 } = require('@nestjs/common');
-
-const { InjectRepository } = require('@nestjs/typeorm');
+const { getRepositoryToken } = require('@nestjs/typeorm');
 const { JwtService } = require('@nestjs/jwt');
 const bcrypt = require('bcrypt');
-
 const { User } = require('../entities/user.entity');
 
+const LOGIN_WINDOW_MS = 60_000;
+const MAX_ATTEMPTS = 20;
+
+function publicUser({ UserID, FullName, Email, Role }) {
+  return { UserID, FullName, Email, Role };
+}
+
+function credentials(data) {
+  const { Email, Password } = data || {};
+  const email = typeof Email === 'string' ? Email.trim().toLowerCase() : '';
+  if (email.length > 150 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new BadRequestException('A valid email address is required');
+  }
+  if (typeof Password !== 'string' || !Password) {
+    throw new BadRequestException('Password is required');
+  }
+  return { email, Password };
+}
+
 class AuthService {
-  constructor(userRepository, jwtService) {
-    this.userRepository = userRepository;
-    this.jwtService = jwtService;
+  constructor(users, jwt) {
+    this.users = users;
+    this.jwt = jwt;
+    this.attempts = new Map();
   }
 
-  // REGISTER USER
   async register(data) {
-    const { FullName, Email, Password } = data || {};
-
+    const { email, Password } = credentials(data);
+    const fullName =
+      typeof data.FullName === 'string' ? data.FullName.trim() : '';
     if (
-      typeof FullName !== 'string' ||
-      typeof Email !== 'string' ||
-      typeof Password !== 'string' ||
-      !FullName.trim() ||
-      !Email.trim() ||
-      Password.length < 8
+      !fullName ||
+      fullName.length > 100 ||
+      Password.length < 8 ||
+      Buffer.byteLength(Password) > 72
     ) {
       throw new BadRequestException(
-        'FullName, valid Email, and Password (minimum 8 characters) are required'
+        'FullName (1 to 100 characters) and a password of at least 8 characters and at most 72 UTF-8 bytes are required',
       );
     }
 
-    const email = Email.trim().toLowerCase();
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new BadRequestException('Invalid email address');
-    }
-
-    const existingUser = await this.userRepository.findOne({
-      where: { Email: email },
-    });
-
-    if (existingUser) {
+    if (await this.users.findOneBy({ Email: email })) {
       throw new ConflictException('Email already registered');
     }
-
-    const hashedPassword = await bcrypt.hash(Password, 10);
-
-    const user = this.userRepository.create({
-      FullName: FullName.trim(),
+    const user = this.users.create({
+      FullName: fullName,
       Email: email,
-      Password: hashedPassword,
+      Password: await bcrypt.hash(Password, 10),
       Role: 'customer',
     });
 
     try {
-      const savedUser = await this.userRepository.save(user);
-
+      const saved = await this.users.save(user);
       return {
         message: 'User registered successfully',
-        user: {
-          UserID: savedUser.UserID,
-          FullName: savedUser.FullName,
-          Email: savedUser.Email,
-          Role: savedUser.Role,
-        },
+        user: publicUser(saved),
       };
     } catch (error) {
-      if (error.code === 'ER_DUP_ENTRY') {
+      if (error.code === 'ER_DUP_ENTRY')
         throw new ConflictException('Email already registered');
-      }
       throw error;
     }
   }
 
-  // LOGIN USER
-  async login(data) {
-    const { Email, Password } = data || {};
-
-    if (
-      typeof Email !== 'string' ||
-      typeof Password !== 'string' ||
-      !Email.trim() ||
-      !Password
-    ) {
-      throw new BadRequestException(
-        'Email and Password are required'
+  checkLoginLimit(ip) {
+    const now = Date.now();
+    for (const [key, attempt] of this.attempts) {
+      if (attempt.expires <= now) this.attempts.delete(key);
+      else break;
+    }
+    const attempt = this.attempts.get(ip) || {
+      count: 0,
+      expires: now + LOGIN_WINDOW_MS,
+    };
+    if (attempt.count >= MAX_ATTEMPTS) {
+      throw new HttpException(
+        'Too many login attempts. Try again in a minute.',
+        429,
       );
     }
-
-    const email = Email.trim().toLowerCase();
-
-    const user = await this.userRepository
-  .createQueryBuilder('user')
-  .addSelect('user.Password')
-  .where('user.Email = :email', { email })
-  .getOne();
-
-    if (!user) {
-      throw new UnauthorizedException(
-        'Invalid email or password'
+    if (!this.attempts.has(ip) && this.attempts.size >= 10000) {
+      throw new HttpException(
+        'Too many login attempts. Try again in a minute.',
+        429,
       );
     }
+    attempt.count++;
+    this.attempts.set(ip, attempt);
+  }
 
-    const passwordMatch = await bcrypt.compare(
-      Password,
-      user.Password
-    );
+  async login(data, ip) {
+    this.checkLoginLimit(ip);
+    const { email, Password } = credentials(data);
+    const user = await this.users
+      .createQueryBuilder('user')
+      .addSelect('user.Password')
+      .where('user.Email = :email', { email })
+      .getOne();
 
-    if (!passwordMatch) {
-      throw new UnauthorizedException(
-        'Invalid email or password'
-      );
+    if (!user || !(await bcrypt.compare(Password, user.Password))) {
+      throw new UnauthorizedException('Invalid email or password');
     }
 
-    const payload = {
+    const accessToken = await this.jwt.signAsync({
       sub: user.UserID,
       email: user.Email,
       role: user.Role,
-    };
-
-    const accessToken = await this.jwtService.signAsync(payload);
-
+    });
     return {
       message: 'Login successful',
       access_token: accessToken,
       token_type: 'Bearer',
-      user: {
-        UserID: user.UserID,
-        FullName: user.FullName,
-        Email: user.Email,
-        Role: user.Role,
-      },
+      user: publicUser(user),
     };
   }
 }
 
 Injectable()(AuthService);
-
-InjectRepository(User)(AuthService, undefined, 0);
-Reflect.defineMetadata(
-  'design:paramtypes',
-  [Object, JwtService],
-  AuthService
-);
+Dependencies(getRepositoryToken(User), JwtService)(AuthService);
 
 module.exports = { AuthService };

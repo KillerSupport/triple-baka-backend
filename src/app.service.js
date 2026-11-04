@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+const { Injectable } = require('@nestjs/common');
 
-@Injectable()
-export class AppService {
+class AppService {
   getHello() {
     return 'Hello World!';
   }
 }
+
+Injectable()(AppService);
+module.exports = { AppService };

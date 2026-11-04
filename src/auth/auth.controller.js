@@ -1,55 +1,44 @@
-
-const { Controller, Post, Body } = require('@nestjs/common');
+const {
+  Body,
+  Controller,
+  Dependencies,
+  Get,
+  HttpCode,
+  Post,
+  Req,
+} = require('@nestjs/common');
+const { bindRoutes } = require('../http');
 const { AuthService } = require('./auth.service');
+const { authenticated } = require('./access');
 
 class AuthController {
   constructor(authService) {
     this.authService = authService;
   }
 
-  // REGISTER
-  async register(data) {
-    return this.authService.register(data);
+  register(body) {
+    return this.authService.register(body);
   }
 
-  // LOGIN
-  async login(data) {
-    return this.authService.login(data);
+  login(body, request) {
+    return this.authService.login(body, request.ip);
+  }
+
+  profile(request) {
+    return request.user;
   }
 }
 
-// NestJS decorators
 Controller('auth')(AuthController);
-
-// POST /auth/register
-Post('register')(
-  AuthController.prototype,
-  'register',
-  Object.getOwnPropertyDescriptor(
-    AuthController.prototype,
-    'register'
-  )
-);
-
+Dependencies(AuthService)(AuthController);
+bindRoutes(AuthController, [
+  ['register', Post('register')],
+  ['login', Post('login'), HttpCode(200)],
+  ['profile', Get('profile'), authenticated()],
+]);
 Body()(AuthController.prototype, 'register', 0);
-
-// POST /auth/login
-Post('login')(
-  AuthController.prototype,
-  'login',
-  Object.getOwnPropertyDescriptor(
-    AuthController.prototype,
-    'login'
-  )
-);
-
 Body()(AuthController.prototype, 'login', 0);
-
-// Dependency injection
-Reflect.defineMetadata(
-  'design:paramtypes',
-  [AuthService],
-  AuthController
-);
+Req()(AuthController.prototype, 'login', 1);
+Req()(AuthController.prototype, 'profile', 0);
 
 module.exports = { AuthController };

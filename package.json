@@ -1,18 +1,18 @@
 {
   "name": "triple-baka-backend",
   "version": "0.0.1",
-  "description": "",
+  "description": "Triple Baka anime merchandise REST API",
   "author": "",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "deploy": "nest deploy",
     "format": "prettier --write \"**/*.js\"",
-    "start": "babel-node index.js",
+    "start": "node index.js",
     "start:dev": "nodemon",
-    "test": "jest",
-    "test:cov": "jest --coverage",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:cov": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config ./test/jest-e2e.json",
+    "admin:promote": "node --env-file=.env scripts/promote-admin.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

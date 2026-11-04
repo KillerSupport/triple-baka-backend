@@ -1,10 +1,10 @@
-
 const { Module } = require('@nestjs/common');
 const { TypeOrmModule } = require('@nestjs/typeorm');
 const { JwtModule } = require('@nestjs/jwt');
-
+const { ConfigService } = require('@nestjs/config');
 const { AuthController } = require('./auth.controller');
 const { AuthService } = require('./auth.service');
+const { AdminGuard, JwtGuard } = require('./access');
 const { User } = require('../entities/user.entity');
 
 class AuthModule {}
@@ -12,24 +12,17 @@ class AuthModule {}
 Module({
   imports: [
     TypeOrmModule.forFeature([User]),
-
     JwtModule.registerAsync({
-      useFactory: () => {
-        if (!process.env.JWT_SECRET) {
-          throw new Error('JWT_SECRET is missing in .env');
-        }
-
-        return {
-          secret: process.env.JWT_SECRET,
-          signOptions: {
-            expiresIn: '1h',
-          },
-        };
-      },
+      inject: [ConfigService],
+      useFactory: (config) => ({
+        secret: config.getOrThrow('JWT_SECRET'),
+        signOptions: { algorithm: 'HS256', expiresIn: '1h' },
+      }),
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, JwtGuard, AdminGuard],
+  exports: [JwtModule, TypeOrmModule, JwtGuard, AdminGuard],
 })(AuthModule);
 
 module.exports = { AuthModule };

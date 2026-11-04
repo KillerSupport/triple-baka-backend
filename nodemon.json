@@ -1,6 +1,6 @@
 {
-  "watch": ["src"],
-  "ext": "js",
+  "watch": ["src", "index.js", ".env"],
+  "ext": "js,env",
   "ignore": ["src/**/*.spec.js"],
-  "exec": "node index --exec babel-node"
+  "exec": "node index.js"
 }
