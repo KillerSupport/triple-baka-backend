@@ -1,0 +1,1735 @@
+{
+  "info": {
+    "name": "Triple Baka Anime Merchandise API",
+    "description": "Runs the full catalog, cart and order workflow. Set adminEmail and adminPassword locally. Use a demo database for the full runner, which creates a unique customer, catalog and orders. Read README.md for admin setup and the shorter presentation sequence.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:3000"
+    },
+    {
+      "key": "adminEmail",
+      "value": ""
+    },
+    {
+      "key": "adminPassword",
+      "value": "",
+      "type": "secret"
+    },
+    {
+      "key": "runId",
+      "value": ""
+    },
+    {
+      "key": "demoPassword",
+      "value": "",
+      "type": "secret"
+    },
+    {
+      "key": "wrongPassword",
+      "value": "",
+      "type": "secret"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "secret"
+    },
+    {
+      "key": "customerToken",
+      "value": "",
+      "type": "secret"
+    },
+    {
+      "key": "categoryId",
+      "value": ""
+    },
+    {
+      "key": "productId",
+      "value": ""
+    },
+    {
+      "key": "cartItemId",
+      "value": ""
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    },
+    {
+      "key": "pendingOrderId",
+      "value": ""
+    },
+    {
+      "key": "disposableProductId",
+      "value": ""
+    },
+    {
+      "key": "disposableCategoryId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "API root",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('runId', pm.variables.replaceIn('{{$guid}}').slice(0, 12));",
+              "pm.collectionVariables.set('demoPassword', pm.variables.replaceIn('{{$guid}}'));",
+              "pm.collectionVariables.set('wrongPassword', pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  pm.expect(pm.response.text()).to.eql('Hello World!');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Register customer",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/auth/register",
+        "auth": {
+          "type": "noauth"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"FullName\": \"Postman Customer\",\n  \"Email\": \"customer-{{runId}}@example.test\",\n  \"Password\": \"{{demoPassword}}\",\n  \"Role\": \"admin\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.user.Role).to.eql('customer');",
+              "  pm.expect(data.user).to.not.have.property('Password');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject duplicate email",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/auth/register",
+        "auth": {
+          "type": "noauth"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"FullName\": \"Postman Customer\",\n  \"Email\": \"customer-{{runId}}@example.test\",\n  \"Password\": \"{{demoPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 409', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject incorrect password",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/auth/login",
+        "auth": {
+          "type": "noauth"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"Email\": \"customer-{{runId}}@example.test\",\n  \"Password\": \"{{wrongPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 401', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login as customer",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/auth/login",
+        "auth": {
+          "type": "noauth"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"Email\": \"customer-{{runId}}@example.test\",\n  \"Password\": \"{{demoPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.access_token.split('.')).to.have.lengthOf(3);",
+              "  pm.collectionVariables.set('customerToken', data.access_token);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login as administrator",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/auth/login",
+        "auth": {
+          "type": "noauth"
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"Email\": \"{{adminEmail}}\",\n  \"Password\": \"{{adminPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.user.Role).to.eql('admin');",
+              "  pm.collectionVariables.set('adminToken', data.access_token);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Read current profile",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/auth/profile",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.Email).to.eql(pm.variables.replaceIn('customer-{{runId}}@example.test'));",
+              "  pm.expect(data).to.not.have.property('Password');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject missing bearer token",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/auth/profile",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 401', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject invalid bearer token",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer invalid-example-token"
+          }
+        ],
+        "url": "{{baseUrl}}/auth/profile",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 401', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject customer catalog write",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/categories",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"CategoryName\": \"Unauthorized\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 403', () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create category",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/categories",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"CategoryName\": \"Figures {{runId}}\",\n  \"Description\": \"Demo collectible figures\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('categoryId', data.CategoryID);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List categories",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/categories",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.some(row => row.CategoryID === Number(pm.variables.get('categoryId')))).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Read category",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/categories/{{categoryId}}",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.CategoryName).to.eql(pm.variables.replaceIn('Figures {{runId}}'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update category",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/categories/{{categoryId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"Description\": \"Updated in Postman\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.Description).to.eql('Updated in Postman');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject invalid product price",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/products",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ProductName\": \"Invalid Price\",\n  \"Price\": -1,\n  \"StockQuantity\": 3,\n  \"CategoryID\": {{categoryId}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create product",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/products",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ProductName\": \"Acrylic Stand {{runId}}\",\n  \"Description\": \"Demo merchandise\",\n  \"Price\": \"129.50\",\n  \"StockQuantity\": 7,\n  \"CategoryID\": {{categoryId}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('productId', data.ProductID);",
+              "  pm.expect(String(data.Price)).to.eql('129.50');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List products",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/products",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.some(row => row.ProductID === Number(pm.variables.get('productId')))).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Read product",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/products/{{productId}}",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.StockQuantity).to.eql(7);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update product",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/products/{{productId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"StockQuantity\": 8\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.StockQuantity).to.eql(8);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List products in category",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/categories/{{categoryId}}/products",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.some(row => row.ProductID === Number(pm.variables.get('productId')))).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject deletion of category in use",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{baseUrl}}/categories/{{categoryId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 409', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Add cart item",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/cart",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ProductID\": {{productId}},\n  \"Quantity\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('cartItemId', data.CartItemID);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List cart",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/cart",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data).to.have.lengthOf(1);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Read cart item",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/cart/{{cartItemId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.Quantity).to.eql(1);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update cart quantity",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/cart/{{cartItemId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"Quantity\": 2\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.Quantity).to.eql(2);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Remove cart item",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{baseUrl}}/cart/{{cartItemId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject checkout on empty cart",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/orders",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ShippingAddress\": \"Demo address, Manila\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 409', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Add cart item for checkout",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/cart",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ProductID\": {{productId}},\n  \"Quantity\": 2\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Checkout",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/orders",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ShippingAddress\": \"Demo address, Manila\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('orderId', data.OrderID);",
+              "  pm.expect(String(data.TotalAmount)).to.eql('259.00');",
+              "  pm.expect(data.items).to.have.lengthOf(1);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List own orders",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/orders",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data).to.have.lengthOf(1);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List all orders",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/orders/all",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.some(row => row.OrderID === Number(pm.variables.get('orderId')))).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Read order and its items",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/orders/{{orderId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.items[0].Quantity).to.eql(2);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Advance order status",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/orders/{{orderId}}/status",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"OrderStatus\": \"processing\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.OrderStatus).to.eql('processing');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject cancellation of processing order by customer",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/orders/{{orderId}}/cancel",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 409', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Add cart item for pending cancellation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/cart",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ProductID\": {{productId}},\n  \"Quantity\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Checkout pending order",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/orders",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ShippingAddress\": \"Demo address, Manila\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('pendingOrderId', data.OrderID);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cancel pending order",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/orders/{{pendingOrderId}}/cancel",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customerToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.OrderStatus).to.eql('cancelled');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Verify stock restored",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/products/{{productId}}",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.expect(data.StockQuantity).to.eql(6);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create disposable product",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/products",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ProductName\": \"Disposable Demo {{runId}}\",\n  \"Price\": \"50.00\",\n  \"StockQuantity\": 1,\n  \"CategoryID\": {{categoryId}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('disposableProductId', data.ProductID);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delete disposable product",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{baseUrl}}/products/{{disposableProductId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Confirm product deletion",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/products/{{disposableProductId}}",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create disposable category",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/categories",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"CategoryName\": \"Disposable Demo {{runId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "pm.test('Response contract', () => {",
+              "  const data = pm.response.json();",
+              "  pm.collectionVariables.set('disposableCategoryId', data.CategoryID);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Read disposable category",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/categories/{{disposableCategoryId}}",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Category exists', () => pm.expect(pm.response.json().CategoryName).to.eql(pm.variables.replaceIn('Disposable Demo {{runId}}')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update disposable category",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/categories/{{disposableCategoryId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"Description\": \"Updated during the CRUD demo\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Description saved', () => pm.expect(pm.response.json().Description).to.eql('Updated during the CRUD demo'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delete disposable category",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{baseUrl}}/categories/{{disposableCategoryId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Confirm category deletion",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/categories/{{disposableCategoryId}}",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
