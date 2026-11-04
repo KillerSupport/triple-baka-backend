@@ -1,22 +1,12 @@
-import { Test } from '@nestjs/testing';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+const { Test } = require('@nestjs/testing');
+const { AppController } = require('./app.controller');
+const { AppService } = require('./app.service');
 
-describe('AppController', () => {
-  let appController;
-
-  beforeEach(async () => {
-    const app = await Test.createTestingModule({
-      controllers: [AppController],
-      providers: [AppService],
-    }).compile();
-
-    appController = app.get(AppController);
-  });
-
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
-    });
-  });
+test('GET / retains the existing greeting', async () => {
+  const module = await Test.createTestingModule({
+    controllers: [AppController],
+    providers: [AppService],
+  }).compile();
+  expect(module.get(AppController).getHello()).toBe('Hello World!');
+  await module.close();
 });

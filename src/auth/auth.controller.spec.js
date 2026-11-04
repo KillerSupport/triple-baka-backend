@@ -1,18 +1,12 @@
-import { Test } from '@nestjs/testing';
-import { AuthController } from './auth.controller';
+const { AuthController } = require('./auth.controller');
 
-describe('Auth Controller', () => {
-  let controller;
-
-  beforeEach(async () => {
-    const module = await Test.createTestingModule({
-      controllers: [AuthController],
-    }).compile();
-
-    controller = module.get(AuthController);
-  });
-
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
-  });
+test('login forwards credentials and the request IP to AuthService', () => {
+  const service = { login: jest.fn() };
+  const controller = new AuthController(service);
+  const data = {
+    Email: 'customer@example.test',
+    Password: 'test only password',
+  };
+  controller.login(data, { ip: '127.0.0.1' });
+  expect(service.login).toHaveBeenCalledWith(data, '127.0.0.1');
 });

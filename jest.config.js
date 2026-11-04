@@ -1,9 +1,8 @@
 /** @type {import('jest').Config} */
-const config = {
+module.exports = {
   moduleFileExtensions: ['js', 'json'],
   rootDir: 'src',
-  testRegex: '.spec.js$',
+  testRegex: '\\.spec\\.js$',
   coverageDirectory: '../coverage',
+  transform: {},
 };
-
-module.exports = config;
